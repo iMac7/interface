@@ -15,12 +15,27 @@ import { isMobile, isNonIOSPhone } from 'utils/userAgent'
 
 import { RPC_URLS } from '../constants/networks'
 import { DEPRECATED_RPC_PROVIDERS, RPC_PROVIDERS } from '../constants/providers'
+import { EIP1193, EIP6963Provider } from './eip6963'
 import { Connection, ConnectionType } from './types'
-import { getInjection, getIsCoinbaseWallet, getIsInjected, getIsMetaMaskWallet } from './utils'
+import { getDeprecatedInjection, getIsCoinbaseWallet, getIsInjected, getIsMetaMaskWallet } from './utils'
 import { UniwalletConnect as UniwalletWCV2Connect, WalletConnectV2 } from './WalletConnectV2'
 
 function onError(error: Error) {
   console.debug(`web3-react error: ${error}`)
+}
+
+export const eip6963Provider = new EIP6963Provider()
+// Wraps all eip1193 wallets into into an eip1193 provider
+const [eip1193, eip1193hooks] = initializeConnector<EIP1193>(
+  (actions) => new EIP1193({ actions, provider: eip6963Provider })
+)
+export const eip6963Connection: Connection = {
+  getName: () => eip6963Provider.currentProvider?.info.name ?? 'Browser Wallet',
+  getIcon: () => eip6963Provider.currentProvider?.info.icon,
+  connector: eip1193,
+  hooks: eip1193hooks,
+  type: ConnectionType.EIP_6963,
+  shouldDisplay: () => false,
 }
 
 const [web3Network, web3NetworkHooks] = initializeConnector<Network>(
@@ -35,7 +50,12 @@ export const networkConnection: Connection = {
 }
 
 const [deprecatedWeb3Network, deprecatedWeb3NetworkHooks] = initializeConnector<Network>(
-  (actions) => new Network({ actions, urlMap: DEPRECATED_RPC_PROVIDERS, defaultChainId: 1 })
+  (actions) =>
+    new Network({
+      actions,
+      urlMap: DEPRECATED_RPC_PROVIDERS,
+      defaultChainId: 1,
+    })
 )
 export const deprecatedNetworkConnection: Connection = {
   getName: () => 'Network',
@@ -56,12 +76,17 @@ const getIsGenericInjector = () => getIsInjected() && !getIsMetaMaskWallet() && 
 const [web3Injected, web3InjectedHooks] = initializeConnector<MetaMask>((actions) => new MetaMask({ actions, onError }))
 
 export const injectedConnection: Connection = {
-  getName: () => getInjection().name,
+  getName: () => getDeprecatedInjection()?.name ?? '',
   connector: web3Injected,
   hooks: web3InjectedHooks,
   type: ConnectionType.INJECTED,
-  getIcon: (isDarkMode: boolean) => getInjection(isDarkMode).icon,
-  shouldDisplay: () => getIsMetaMaskWallet() || getShouldAdvertiseMetaMask() || getIsGenericInjector(),
+  getIcon: (isDarkMode: boolean) => getDeprecatedInjection(isDarkMode)?.icon,
+  shouldDisplay: () => {
+    console.log('cartcrom', 'shouldDisplay')
+    return (
+      (getIsMetaMaskWallet() || getShouldAdvertiseMetaMask() || getIsGenericInjector()) && !!getDeprecatedInjection()
+    )
+  },
   // If on non-injected, non-mobile browser, prompt user to install Metamask
   overrideActivate: () => {
     if (getShouldAdvertiseMetaMask()) {
@@ -189,6 +214,8 @@ export const connections = [
   injectedConnection,
   walletConnectV2Connection,
   coinbaseWalletConnection,
+  eip6963Connection,
+  // network connector should be last in the list, as it should be the fallback if no other connector is active
   networkConnection,
   deprecatedNetworkConnection,
 ]
@@ -216,6 +243,8 @@ export function getConnection(c: Connector | ConnectionType) {
         return deprecatedNetworkConnection
       case ConnectionType.GNOSIS_SAFE:
         return gnosisSafeConnection
+      case ConnectionType.EIP_6963:
+        return eip6963Connection
     }
   }
 }

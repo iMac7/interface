@@ -1,9 +1,11 @@
+import { useWeb3React } from '@web3-react/core'
 import { Unicon } from 'components/Unicon'
 import { Connection, ConnectionType } from 'connection/types'
 import useENSAvatar from 'hooks/useENSAvatar'
 import styled from 'styled-components'
 import { useIsDarkMode } from 'theme/components/ThemeToggle'
 import { flexColumnNoWrap } from 'theme/styles'
+import { getWalletMeta } from 'utils/walletMeta'
 
 import sockImg from '../../assets/svg/socks.svg'
 import { useHasSocks } from '../../hooks/useSocksBalance'
@@ -59,9 +61,14 @@ const Socks = () => {
 
 const MiniWalletIcon = ({ connection, side }: { connection: Connection; side: 'left' | 'right' }) => {
   const isDarkMode = useIsDarkMode()
+  const { provider } = useWeb3React()
+
+  // Uses icon from wallet meta when available, otherwise uses icon from connection
+  const icon = (provider && getWalletMeta(provider)?.icons?.[0]) ?? connection.getIcon?.(isDarkMode)
+
   return (
     <MiniIconContainer side={side}>
-      <MiniImg src={connection.getIcon?.(isDarkMode)} alt={`${connection.getName()} icon`} />
+      <MiniImg src={icon} alt={`${connection.getName()} icon`} />
     </MiniIconContainer>
   )
 }

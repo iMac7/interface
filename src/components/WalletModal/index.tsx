@@ -3,11 +3,13 @@ import IconButton from 'components/AccountDrawer/IconButton'
 import { AutoColumn } from 'components/Column'
 import { Settings } from 'components/Icons/Settings'
 import { AutoRow } from 'components/Row'
-import { connections, deprecatedNetworkConnection, networkConnection } from 'connection'
+import { connections, deprecatedNetworkConnection, eip6963Connection, networkConnection } from 'connection'
 import { ActivationStatus, useActivationState } from 'connection/activate'
+import { EIP6963_PROVIDER_MAP } from 'connection/eip6963'
+import { getRecentlyUsedInjector } from 'connection/meta'
 import { isSupportedChain } from 'constants/chains'
 import { useFallbackProviderEnabled } from 'featureFlags/flags/fallbackProvider'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
 import { ThemedText } from 'theme/components'
 import { flexColumnNoWrap } from 'theme/styles'
@@ -38,6 +40,21 @@ const PrivacyPolicyWrapper = styled.div`
   padding: 0 4px;
 `
 
+function getOptions() {
+  return EIP6963_PROVIDER_MAP.map
+}
+
+function subscribe(listener: () => void) {
+  EIP6963_PROVIDER_MAP.listeners.add(listener)
+  return () => {
+    EIP6963_PROVIDER_MAP.listeners.delete(listener)
+  }
+}
+
+function useInjectedOptions() {
+  return useSyncExternalStore(subscribe, getOptions)
+}
+
 export default function WalletModal({ openSettings }: { openSettings: () => void }) {
   const { connector, chainId } = useWeb3React()
 
@@ -54,6 +71,25 @@ export default function WalletModal({ openSettings }: { openSettings: () => void
     }
   }, [chainId, connector, fallbackProviderEnabled])
 
+  const injectedOptionMap = useInjectedOptions()
+
+  const connectionList = useMemo(() => {
+    console.log('cartcrom', 'here', Array.from(injectedOptionMap.values()).length)
+    const list: JSX.Element[] = []
+    for (const connection of connections) {
+      if (connection.shouldDisplay()) list.push(<Option key={connection.getName()} connection={connection} />)
+    }
+
+    for (const injector of injectedOptionMap.values()) {
+      // The most-recently-used injector should appear as the second in list, other injectors should appear above the last item of the list
+      const insertIndex = injector.info.rdns === getRecentlyUsedInjector() ? 1 : list.length - 1
+
+      list.splice(insertIndex, 0, <Option connection={eip6963Connection} eip6963Info={injector.info} />)
+    }
+
+    return list
+  }, [injectedOptionMap])
+
   return (
     <Wrapper data-testid="wallet-modal">
       <AutoRow justify="space-between" width="100%" marginBottom="16px">
@@ -64,13 +100,7 @@ export default function WalletModal({ openSettings }: { openSettings: () => void
         <ConnectionErrorView />
       ) : (
         <AutoColumn gap="16px">
-          <OptionGrid data-testid="option-grid">
-            {connections
-              .filter((connection) => connection.shouldDisplay())
-              .map((connection) => (
-                <Option key={connection.getName()} connection={connection} />
-              ))}
-          </OptionGrid>
+          <OptionGrid data-testid="option-grid">{connectionList}</OptionGrid>
           <PrivacyPolicyWrapper>
             <PrivacyPolicyNotice />
           </PrivacyPolicyWrapper>

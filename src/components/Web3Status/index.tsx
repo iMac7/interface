@@ -7,9 +7,15 @@ import { usePendingActivity } from 'components/AccountDrawer/MiniPortfolio/Activ
 import Loader, { LoaderV3 } from 'components/Icons/LoadingSpinner'
 import { IconWrapper } from 'components/Identicon/StatusIcon'
 import PrefetchBalancesWrapper from 'components/PrefetchBalancesWrapper/PrefetchBalancesWrapper'
-import { getConnection } from 'connection'
+import { eip6963Provider, getConnection } from 'connection'
 import { useConnectionReady } from 'connection/eagerlyConnect'
-import { ConnectionMeta, getPersistedConnectionMeta, setPersistedConnectionMeta } from 'connection/meta'
+import {
+  ConnectionMeta,
+  getPersistedConnectionMeta,
+  setPersistedConnectionMeta,
+  setRecentlyUsedInjector,
+} from 'connection/meta'
+import { ConnectionType } from 'connection/types'
 import useENSName from 'hooks/useENSName'
 import useLast from 'hooks/useLast'
 import { navSearchInputVisibleSize } from 'hooks/useScreenSize'
@@ -179,6 +185,7 @@ function Web3StatusInner() {
         ENSName: ENSName ?? undefined,
       }
       setPersistedConnectionMeta(meta)
+      if (connection.type === ConnectionType.EIP_6963) setRecentlyUsedInjector(eip6963Provider.currentProvider?.info)
     }
   }, [ENSName, account, connection.type])
 

@@ -1,9 +1,11 @@
+import { EIP6963ProviderInfo } from './eip6963'
 import { ConnectionType, toConnectionType } from './types'
 
 export interface ConnectionMeta {
   type: ConnectionType
   address?: string
   ENSName?: string
+  latestEip6963rdns?: string
 }
 
 export const connectionMetaKey = 'connection_meta'
@@ -34,4 +36,19 @@ export function setPersistedConnectionMeta(meta: ConnectionMeta) {
 
 export function deletePersistedConnectionMeta() {
   localStorage.removeItem(connectionMetaKey)
+}
+
+const recentlyUsedInjectorKey = 'recently_used_injector'
+export function getRecentlyUsedInjector(): string | null {
+  try {
+    const value = localStorage.getItem(recentlyUsedInjectorKey)
+    return value ? JSON.parse(value) : null
+  } catch (e) {
+    console.warn(e)
+  }
+  return null
+}
+
+export function setRecentlyUsedInjector(injectorOption?: EIP6963ProviderInfo) {
+  localStorage.setItem(recentlyUsedInjectorKey, JSON.stringify(injectorOption?.rdns))
 }
